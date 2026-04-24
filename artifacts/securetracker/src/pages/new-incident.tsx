@@ -203,14 +203,17 @@ export default function NewIncident() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Назначить аналитика</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={(v) => field.onChange(v === "none" ? "" : v)}
+                      defaultValue={field.value || "none"}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Не назначен (в общую очередь)" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Не назначен</SelectItem>
+                        <SelectItem value="none">Не назначен</SelectItem>
                         {analystsAndAdmins.map(user => (
                           <SelectItem key={user.id} value={user.id.toString()}>{user.name}</SelectItem>
                         ))}
