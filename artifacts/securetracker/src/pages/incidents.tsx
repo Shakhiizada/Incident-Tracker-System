@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import { Link } from "wouter";
-import { useListIncidents, getListIncidentsQueryKey, IncidentStatus, IncidentSeverity, IncidentType } from "@workspace/api-client-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Link, useSearch, useLocation } from "wouter";
+import { useListIncidents, getListIncidentsQueryKey, IncidentStatus, IncidentSeverity, IncidentType, UserRole } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,48 +12,88 @@ import { ru } from "date-fns/locale";
 import { Search, Plus, FilterX, AlertCircle } from "lucide-react";
 import { incidentStatusLabels, incidentSeverityLabels, incidentTypeLabels } from "@/lib/labels";
 import { useDebounce } from "@/hooks/use-debounce";
-import { motion } from "framer-motion";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Incidents() {
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 300);
-  
-  const [status, setStatus] = useState<IncidentStatus | "all">("all");
-  const [severity, setSeverity] = useState<IncidentSeverity | "all">("all");
-  const [type, setType] = useState<IncidentType | "all">("all");
+  const { user } = useAuth();
+  const isStaff = user?.role === UserRole.admin || user?.role === UserRole.analyst;
+  const search$ = useSearch();
+  const [, setLocation] = useLocation();
 
-  const { data: incidents, isLoading } = useListIncidents(
-    {
-      search: debouncedSearch || undefined,
-      status: status !== "all" ? status : undefined,
-      severity: severity !== "all" ? severity : undefined,
-      type: type !== "all" ? type : undefined,
-    },
-    {
-      query: {
-        queryKey: getListIncidentsQueryKey({
-          search: debouncedSearch || undefined,
-          status: status !== "all" ? status : undefined,
-          severity: severity !== "all" ? severity : undefined,
-          type: type !== "all" ? type : undefined,
-        })
-      }
-    }
-  );
+  const params = useMemo(() => new URLSearchParams(search$ || ""), [search$]);
+  const initialStatus = (params.get("status") as IncidentStatus | null) ?? "all";
+  const initialSeverity = (params.get("severity") as IncidentSeverity | null) ?? "all";
+  const initialType = (params.get("type") as IncidentType | null) ?? "all";
+  const initialReporterMe = params.get("reporterId") === "me";
+  const initialAssigneeMe = params.get("assigneeId") === "me";
+  const initialSearch = params.get("q") ?? "";
+
+  const [search, setSearch] = useState(initialSearch);
+  const [status, setStatus] = useState<IncidentStatus | "all">(initialStatus);
+  const [severity, setSeverity] = useState<IncidentSeverity | "all">(initialSeverity);
+  const [type, setType] = useState<IncidentType | "all">(initialType);
+  const [reporterMe, setReporterMe] = useState(initialReporterMe);
+  const [assigneeMe, setAssigneeMe] = useState(initialAssigneeMe);
+
+  useEffect(() => {
+    setStatus(initialStatus);
+    setSeverity(initialSeverity);
+    setType(initialType);
+    setReporterMe(initialReporterMe);
+    setAssigneeMe(initialAssigneeMe);
+    setSearch(initialSearch);
+  }, [search$]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Employees can only see their own incidents
+  const forceReporterMe = !isStaff;
+  const effectiveReporterMe = forceReporterMe || reporterMe;
+
+  const debouncedSearch = useDebounce(search, 300);
+
+  const queryArgs: Record<string, any> = {
+    search: debouncedSearch || undefined,
+    status: status !== "all" ? status : undefined,
+    severity: severity !== "all" ? severity : undefined,
+    type: type !== "all" ? type : undefined,
+  };
+  if (effectiveReporterMe) queryArgs.reporterId = "me";
+  if (assigneeMe) queryArgs.assigneeId = "me";
+
+  const { data: incidents, isLoading } = useListIncidents(queryArgs as any, {
+    query: { queryKey: getListIncidentsQueryKey(queryArgs as any) },
+  });
 
   const resetFilters = () => {
     setSearch("");
     setStatus("all");
     setSeverity("all");
     setType("all");
+    if (isStaff) {
+      setReporterMe(false);
+      setAssigneeMe(false);
+    }
+    setLocation("/incidents");
   };
+
+  const activeChips: Array<{ label: string }> = [];
+  if (status !== "all") activeChips.push({ label: `Статус: ${incidentStatusLabels[status]}` });
+  if (severity !== "all") activeChips.push({ label: `Критичность: ${incidentSeverityLabels[severity]}` });
+  if (type !== "all") activeChips.push({ label: `Тип: ${incidentTypeLabels[type]}` });
+  if (effectiveReporterMe) activeChips.push({ label: forceReporterMe ? "Только мои заявки" : "Зарегистрированы мной" });
+  if (assigneeMe) activeChips.push({ label: "Назначены мне" });
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Инциденты</h1>
-          <p className="text-muted-foreground">Реестр инцидентов информационной безопасности</p>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {forceReporterMe ? "Мои инциденты" : "Инциденты"}
+          </h1>
+          <p className="text-muted-foreground">
+            {forceReporterMe
+              ? "Заявки, которые вы зарегистрировали"
+              : "Реестр инцидентов информационной безопасности"}
+          </p>
         </div>
         <Button asChild>
           <Link href="/incidents/new">
@@ -64,7 +104,7 @@ export default function Incidents() {
       </div>
 
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -75,8 +115,8 @@ export default function Incidents() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            
-            <div className="flex flex-wrap gap-4">
+
+            <div className="flex flex-wrap gap-2">
               <Select value={status} onValueChange={(val: any) => setStatus(val)}>
                 <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Статус" />
@@ -113,7 +153,28 @@ export default function Incidents() {
                 </SelectContent>
               </Select>
 
-              {(search || status !== "all" || severity !== "all" || type !== "all") && (
+              {isStaff && (
+                <>
+                  <Button
+                    type="button"
+                    variant={reporterMe ? "default" : "outline"}
+                    onClick={() => setReporterMe((v) => !v)}
+                    className="px-3"
+                  >
+                    Зарегистрированы мной
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={assigneeMe ? "default" : "outline"}
+                    onClick={() => setAssigneeMe((v) => !v)}
+                    className="px-3"
+                  >
+                    Назначены мне
+                  </Button>
+                </>
+              )}
+
+              {(search || status !== "all" || severity !== "all" || type !== "all" || (isStaff && (reporterMe || assigneeMe))) && (
                 <Button variant="ghost" onClick={resetFilters} className="px-3">
                   <FilterX className="w-4 h-4 mr-2" />
                   Сбросить
@@ -121,6 +182,19 @@ export default function Incidents() {
               )}
             </div>
           </div>
+
+          {activeChips.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {activeChips.map((c) => (
+                <span
+                  key={c.label}
+                  className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-primary/10 text-primary border border-primary/20"
+                >
+                  {c.label}
+                </span>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -162,8 +236,8 @@ export default function Incidents() {
                   </TableCell>
                 </TableRow>
               ) : (
-                incidents?.map((incident, i) => (
-                  <TableRow key={incident.id} className="group hover:bg-muted/30 cursor-pointer transition-colors">
+                incidents?.map((incident) => (
+                  <TableRow key={incident.id} className="group hover:bg-muted/30 cursor-pointer transition-colors relative">
                     <TableCell className="font-mono text-xs font-medium text-muted-foreground">
                       <Link href={`/incidents/${incident.id}`}>
                         <span className="absolute inset-0 z-10" />

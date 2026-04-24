@@ -1,6 +1,7 @@
 import React from "react";
 import { useLocation } from "wouter";
 import { useCreateIncident, useListUsers, getListUsersQueryKey, IncidentType, IncidentSeverity, UserRole } from "@workspace/api-client-react";
+import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -32,9 +33,11 @@ export default function NewIncident() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreateIncident();
+  const { user } = useAuth();
+  const canAssign = user?.role === UserRole.admin || user?.role === UserRole.analyst;
 
   const { data: users } = useListUsers({
-    query: { queryKey: getListUsersQueryKey() }
+    query: { queryKey: getListUsersQueryKey(), enabled: canAssign }
   });
 
   const analystsAndAdmins = users?.filter(u => u.role === UserRole.admin || u.role === UserRole.analyst) || [];
@@ -197,33 +200,39 @@ export default function NewIncident() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="assigneeId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Назначить аналитика</FormLabel>
-                    <Select
-                      onValueChange={(v) => field.onChange(v === "none" ? "" : v)}
-                      defaultValue={field.value || "none"}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Не назначен (в общую очередь)" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">Не назначен</SelectItem>
-                        {analystsAndAdmins.map(user => (
-                          <SelectItem key={user.id} value={user.id.toString()}>{user.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>Вы можете сразу назначить инцидент на специалиста, если он известен.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {canAssign ? (
+                <FormField
+                  control={form.control}
+                  name="assigneeId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Назначить аналитика</FormLabel>
+                      <Select
+                        onValueChange={(v) => field.onChange(v === "none" ? "" : v)}
+                        defaultValue={field.value || "none"}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Не назначен (в общую очередь)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">Не назначен</SelectItem>
+                          {analystsAndAdmins.map(user => (
+                            <SelectItem key={user.id} value={user.id.toString()}>{user.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Вы можете сразу назначить инцидент на специалиста, если он известен.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <div className="bg-muted/50 border rounded-md p-4 text-sm text-muted-foreground">
+                  Заявка автоматически попадёт в общую очередь и будет назначена ответственному аналитику ИБ.
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-border">
                 <FormField

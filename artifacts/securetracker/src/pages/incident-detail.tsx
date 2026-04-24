@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Clock, Paperclip, Send, ShieldAlert, User as UserIcon, Activity } from "lucide-react";
+import { ArrowLeft, Clock, Loader2, Paperclip, Send, ShieldAlert, User as UserIcon, Activity } from "lucide-react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { incidentStatusLabels } from "@/lib/labels";

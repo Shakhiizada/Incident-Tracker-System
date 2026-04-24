@@ -61,7 +61,7 @@ async function loadIncidentWithRelations(id: number) {
 }
 
 router.get("/incidents", requireAuth, async (req, res): Promise<void> => {
-  const { status, severity, type, assigneeId, search } = req.query;
+  const { status, severity, type, assigneeId, reporterId, mine, search } = req.query;
   const filters = [];
 
   if (typeof status === "string" && (VALID_STATUSES as string[]).includes(status)) {
@@ -74,10 +74,27 @@ router.get("/incidents", requireAuth, async (req, res): Promise<void> => {
     filters.push(eq(incidentsTable.type, type as IncidentType));
   }
   if (typeof assigneeId === "string") {
-    const id = Number.parseInt(assigneeId, 10);
-    if (Number.isFinite(id)) {
-      filters.push(eq(incidentsTable.assigneeId, id));
+    if (assigneeId === "me") {
+      filters.push(eq(incidentsTable.assigneeId, req.user!.id));
+    } else {
+      const id = Number.parseInt(assigneeId, 10);
+      if (Number.isFinite(id)) {
+        filters.push(eq(incidentsTable.assigneeId, id));
+      }
     }
+  }
+  if (typeof reporterId === "string") {
+    if (reporterId === "me") {
+      filters.push(eq(incidentsTable.reporterId, req.user!.id));
+    } else {
+      const id = Number.parseInt(reporterId, 10);
+      if (Number.isFinite(id)) {
+        filters.push(eq(incidentsTable.reporterId, id));
+      }
+    }
+  }
+  if (mine === "true") {
+    filters.push(eq(incidentsTable.reporterId, req.user!.id));
   }
   if (typeof search === "string" && search.trim() !== "") {
     const term = `%${search.trim()}%`;
