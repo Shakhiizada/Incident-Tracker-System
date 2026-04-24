@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "SecureTracker"
+version = "1.0.0"
+id = "artifacts/securetracker"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24946
+
+[services.development]
+run = "pnpm --filter @workspace/securetracker run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/securetracker", "run", "build" ]
+publicDir = "artifacts/securetracker/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24946"
+BASE_PATH = "/"

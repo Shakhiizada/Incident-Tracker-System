@@ -3,20 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SecureTracker API - IS Incident Management System
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: Users
+  - name: incidents
+    description: Incidents
+  - name: comments
+    description: Incident comments
+  - name: audit
+    description: Audit log
+  - name: stats
+    description: Dashboard statistics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +36,366 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "204":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /incidents:
+    get:
+      operationId: listIncidents
+      tags: [incidents]
+      summary: List incidents with filters
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/IncidentStatus"
+        - in: query
+          name: severity
+          schema:
+            $ref: "#/components/schemas/IncidentSeverity"
+        - in: query
+          name: type
+          schema:
+            $ref: "#/components/schemas/IncidentType"
+        - in: query
+          name: assigneeId
+          schema:
+            type: integer
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of incidents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Incident"
+    post:
+      operationId: createIncident
+      tags: [incidents]
+      summary: Register a new incident
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIncidentRequest"
+      responses:
+        "201":
+          description: Incident created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+
+  /incidents/{id}:
+    get:
+      operationId: getIncident
+      tags: [incidents]
+      summary: Get incident by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Incident details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateIncident
+      tags: [incidents]
+      summary: Update incident
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateIncidentRequest"
+      responses:
+        "200":
+          description: Updated incident
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+
+  /incidents/{id}/escalate:
+    post:
+      operationId: escalateIncident
+      tags: [incidents]
+      summary: Escalate an incident (raise severity)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Escalated incident
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+
+  /incidents/{id}/comments:
+    get:
+      operationId: listIncidentComments
+      tags: [comments]
+      summary: List comments for an incident
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+    post:
+      operationId: createIncidentComment
+      tags: [comments]
+      summary: Add a comment to an incident
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+      responses:
+        "201":
+          description: Created comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+
+  /incidents/{id}/audit:
+    get:
+      operationId: listIncidentAudit
+      tags: [audit]
+      summary: List audit log entries for an incident
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEntry"
+
+  /audit:
+    get:
+      operationId: listAudit
+      tags: [audit]
+      summary: List all audit log entries (recent first)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEntry"
+
+  /stats/summary:
+    get:
+      operationId: getStatsSummary
+      tags: [stats]
+      summary: Dashboard summary
+      responses:
+        "200":
+          description: Summary statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsSummary"
+
+  /stats/by-type:
+    get:
+      operationId: getStatsByType
+      tags: [stats]
+      summary: Incident counts grouped by type
+      responses:
+        "200":
+          description: Counts by type
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TypeCount"
+
+  /stats/by-severity:
+    get:
+      operationId: getStatsBySeverity
+      tags: [stats]
+      summary: Incident counts grouped by severity
+      responses:
+        "200":
+          description: Counts by severity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SeverityCount"
+
+  /stats/timeline:
+    get:
+      operationId: getStatsTimeline
+      tags: [stats]
+      summary: Incidents created per day for the last N days
+      parameters:
+        - in: query
+          name: days
+          schema:
+            type: integer
+            default: 14
+      responses:
+        "200":
+          description: Daily counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimelinePoint"
+
+  /stats/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [stats]
+      summary: Recent audit activity feed
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEntry"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +403,229 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    UserRole:
+      type: string
+      enum: [admin, analyst, employee]
+
+    IncidentType:
+      type: string
+      enum: [data_leak, ddos, malware, phishing, unauthorized_access, insider_threat, social_engineering, other]
+
+    IncidentSeverity:
+      type: string
+      enum: [low, medium, high, critical]
+
+    IncidentStatus:
+      type: string
+      enum: [new, in_progress, resolved, closed]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, email, name, role, createdAt]
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required: [email, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+      required: [user]
+
+    Incident:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        type:
+          $ref: "#/components/schemas/IncidentType"
+        severity:
+          $ref: "#/components/schemas/IncidentSeverity"
+        status:
+          $ref: "#/components/schemas/IncidentStatus"
+        reporterId:
+          type: integer
+        reporter:
+          $ref: "#/components/schemas/User"
+        assigneeId:
+          type: [integer, "null"]
+        assignee:
+          oneOf:
+            - $ref: "#/components/schemas/User"
+            - type: "null"
+        attachmentUrl:
+          type: [string, "null"]
+        attachmentName:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, title, description, type, severity, status, reporterId, createdAt, updatedAt]
+
+    CreateIncidentRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 3
+        description:
+          type: string
+          minLength: 5
+        type:
+          $ref: "#/components/schemas/IncidentType"
+        severity:
+          $ref: "#/components/schemas/IncidentSeverity"
+        assigneeId:
+          type: [integer, "null"]
+        attachmentUrl:
+          type: [string, "null"]
+        attachmentName:
+          type: [string, "null"]
+      required: [title, description, type, severity]
+
+    UpdateIncidentRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        type:
+          $ref: "#/components/schemas/IncidentType"
+        severity:
+          $ref: "#/components/schemas/IncidentSeverity"
+        status:
+          $ref: "#/components/schemas/IncidentStatus"
+        assigneeId:
+          type: [integer, "null"]
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        incidentId:
+          type: integer
+        authorId:
+          type: integer
+        author:
+          $ref: "#/components/schemas/User"
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, incidentId, authorId, body, createdAt]
+
+    CreateCommentRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+      required: [body]
+
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        incidentId:
+          type: [integer, "null"]
+        userId:
+          type: [integer, "null"]
+        user:
+          oneOf:
+            - $ref: "#/components/schemas/User"
+            - type: "null"
+        action:
+          type: string
+        details:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, action, createdAt]
+
+    StatsSummary:
+      type: object
+      properties:
+        total:
+          type: integer
+        new:
+          type: integer
+        inProgress:
+          type: integer
+        resolved:
+          type: integer
+        closed:
+          type: integer
+        critical:
+          type: integer
+        last7Days:
+          type: integer
+        avgResolutionHours:
+          type: number
+      required: [total, new, inProgress, resolved, closed, critical, last7Days, avgResolutionHours]
+
+    TypeCount:
+      type: object
+      properties:
+        type:
+          $ref: "#/components/schemas/IncidentType"
+        count:
+          type: integer
+      required: [type, count]
+
+    SeverityCount:
+      type: object
+      properties:
+        severity:
+          $ref: "#/components/schemas/IncidentSeverity"
+        count:
+          type: integer
+      required: [severity, count]
+
+    TimelinePoint:
+      type: object
+      properties:
+        date:
+          type: string
+        count:
+          type: integer
+      required: [date, count]
