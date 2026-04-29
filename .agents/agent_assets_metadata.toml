@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "yWQkwCPjLo7hjmc3o0QN9"
+uri = "file://exports/securetracker.zip"
+type = "unspecified"
+title = "SecureTracker — весь проект (ZIP)"
